@@ -13,6 +13,8 @@ from orchestration.dashboard import DASHBOARD_HTML
 from orchestration.metrics import RuntimeMetrics
 from orchestration.plugins import registry as plugin_registry
 from orchestration.queue import InMemoryJobQueue, OrchestrationJob
+from orchestration.replay import ReplayEngine
+from orchestration.trace_store import TraceStore
 from orchestration.websocket_manager import WebSocketEventManager
 from orchestration.worker_pool import WorkerPool
 
@@ -58,6 +60,8 @@ app = FastAPI(
 metrics = RuntimeMetrics()
 job_queue = InMemoryJobQueue()
 event_manager = WebSocketEventManager()
+trace_store = TraceStore()
+replay_engine = ReplayEngine()
 worker_pool = WorkerPool(queue=job_queue)
 worker_pool.start()
 
@@ -105,6 +109,79 @@ def runtime_metrics() -> dict:
     snapshot["worker_pool"] = worker_pool.snapshot()
     snapshot["websocket_clients"] = len(event_manager.active_connections)
     return snapshot
+
+
+@app.get("/traces", tags=["traces"])
+def list_traces() -> list[dict]:
+    """List persisted orchestration traces."""
+    return trace_store.list_traces()
+
+
+@app.get("/traces/{trace_id}", tags=["traces"])
+def get_trace(trace_id: str) -> dict:
+    """Return one persisted trace."""
+    trace = trace_store.get_trace(trace_id)
+
+    if trace is None:
+        raise HTTPException(status_code=404, detail="Trace not found")
+
+    return trace
+
+
+@app.post("/replay/{trace_id}", tags=["replay"])
+def replay_trace(trace_id: str) -> dict:
+    """Replay a persisted orchestration trace."""
+    trace = trace_store.get_trace(trace_id)
+
+    if trace is None:
+        raise HTTPException(status_code=404, detail="Trace not found")
+
+    replay = replay_engine.replay_trace(trace)
+
+    event_manager.broadcast_sync(
+        "trace_replayed",
+        trace_id=trace_id,
+        replay_id=replay.replay_id,
+    )
+
+    return replay.to_dict()
+
+
+@app.post("/replay/{trace_id}/node/{span_name}", tags=["replay"])
+def replay_node(trace_id: str, span_name: str) -> dict:
+    """Replay one workflow node/span from a persisted trace."""
+    trace = trace_store.get_trace(trace_id)
+
+    if trace is None:
+        raise HTTPException(status_code=404, detail="Trace not found")
+
+    replay = replay_engine.replay_node(trace, span_name)
+
+    event_manager.broadcast_sync(
+        "node_replayed",
+        trace_id=trace_id,
+        replay_id=replay.replay_id,
+        span_name=span_name,
+    )
+
+    return replay.to_dict()
+
+
+@app.get("/replays", tags=["replay"])
+def list_replays() -> list[dict]:
+    """List replay history."""
+    return replay_engine.list_replays()
+
+
+@app.get("/replays/{replay_id}", tags=["replay"])
+def get_replay(replay_id: str) -> dict:
+    """Return one replay record."""
+    replay = replay_engine.get_replay(replay_id)
+
+    if replay is None:
+        raise HTTPException(status_code=404, detail="Replay not found")
+
+    return replay
 
 
 @app.get("/plugins", tags=["plugins"])
