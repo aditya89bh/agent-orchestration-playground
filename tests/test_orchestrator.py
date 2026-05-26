@@ -5,7 +5,10 @@ GOAL = "Create a landing page outline for an AI consulting service."
 
 
 def test_orchestrator_runs_full_loop(tmp_path) -> None:
-    orchestrator = SwarmOrchestrator(memory_path=tmp_path / "memory.json")
+    orchestrator = SwarmOrchestrator(
+        memory_path=tmp_path / "memory.json",
+        history_path=tmp_path / "run_history.json",
+    )
     result = orchestrator.run(GOAL)
 
     actors = [event["actor"] for event in result["event_log"]]
@@ -14,6 +17,8 @@ def test_orchestrator_runs_full_loop(tmp_path) -> None:
     assert result["task_graph"]["nodes"]
     assert result["draft"]["sections"]
     assert result["review"]["approved"] is True
+    assert result["run_record"]["goal"] == GOAL
+    assert result["run_record"]["event_count"] == len(result["event_log"])
     assert "CommanderAgent" in actors
     assert "PlannerAgent" in actors
     assert "BuilderAgent" in actors
@@ -23,10 +28,12 @@ def test_orchestrator_runs_full_loop(tmp_path) -> None:
 
 def test_memory_influences_second_run(tmp_path) -> None:
     memory_path = tmp_path / "memory.json"
-    first = SwarmOrchestrator(memory_path=memory_path)
+    history_path = tmp_path / "run_history.json"
+
+    first = SwarmOrchestrator(memory_path=memory_path, history_path=history_path)
     first.run(GOAL)
 
-    second = SwarmOrchestrator(memory_path=memory_path)
+    second = SwarmOrchestrator(memory_path=memory_path, history_path=history_path)
     result = second.run(GOAL)
 
     task_titles = [node["title"] for node in result["task_graph"]["nodes"]]
