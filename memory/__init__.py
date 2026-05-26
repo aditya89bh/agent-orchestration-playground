@@ -1,4 +1,4 @@
-"""JSON-backed memory utilities."""
+"""Memory components for the deterministic swarm."""
 
 from memory.memory_store import MemoryStore
 

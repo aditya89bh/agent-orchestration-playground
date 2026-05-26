@@ -1,21 +1,20 @@
-"""Commander agent responsible for accepting and framing user goals."""
+"""Commander agent for accepting and normalizing user goals."""
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class CommanderAgent:
-    """Normalize a user goal into a run brief for the swarm."""
+    """Accept a user goal and create a clean orchestration brief."""
 
-    name: str = "Commander"
+    name: str = "CommanderAgent"
 
-    def create_brief(self, goal: str, recalled_feedback: list[str] | None = None) -> dict[str, object]:
-        """Create a deterministic run brief from a goal and prior feedback."""
-        clean_goal = " ".join(goal.strip().split())
-        if not clean_goal:
+    def accept_goal(self, goal: str) -> dict[str, str]:
+        """Validate and normalize a user goal."""
+        normalized = " ".join(goal.strip().split())
+        if not normalized:
             raise ValueError("Goal must not be empty.")
         return {
-            "goal": clean_goal,
-            "intent": "Produce a clear, reviewable deliverable.",
-            "recalled_feedback": recalled_feedback or [],
+            "goal": normalized,
+            "success_criteria": "Produce a clear draft, review it, and persist useful feedback.",
         }

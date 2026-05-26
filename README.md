@@ -1,43 +1,39 @@
 # Agent Orchestration Playground
 
-A portfolio-grade Python playground for experimenting with a deterministic commander-worker multi-agent swarm.
+A deterministic Python playground for a commander-worker agent swarm with planning, building, review, event logging, and JSON-backed memory.
 
-## Thesis
+## Project thesis
 
-Reliable multi-agent systems need more than clever prompts. They need visible orchestration, review loops, structured memory, and audit-friendly event logs. This repository demonstrates those ideas without depending on external LLM APIs.
+Reliable multi-agent systems should be inspectable before they are impressive. This repository demonstrates the core architecture of a memory-aware agent swarm without external LLM calls, hidden state, or production framework complexity.
 
-The goal is to make the architecture easy to inspect:
+The project is intentionally deterministic so developers can review the orchestration loop, test the behavior, and reason about how memory changes later runs.
 
-- a `CommanderAgent` accepts a user goal and coordinates the run
-- a `PlannerAgent` breaks the goal into actionable steps
-- a `BuilderAgent` creates a draft outcome from those steps
-- a `ReviewerAgent` evaluates the draft and gives feedback
-- a `MemoryAgent` records outcomes and recalls prior feedback
-- a `SwarmOrchestrator` wires the full flow together
-
-## Not production
-
-This is **not a production framework**. It is an experimental architecture playground for reliable, memory-aware multi-agent orchestration. The agents are deterministic and intentionally simple so developers can focus on orchestration patterns rather than model behavior.
-
-## Architecture overview
+## Architecture diagram
 
 ```text
 User Goal
-   ↓
+   |
+   v
 CommanderAgent
-   ↓
-PlannerAgent ──→ plan steps
-   ↓
-BuilderAgent ──→ draft artifact
-   ↓
-ReviewerAgent ─→ feedback + approval signal
-   ↓
-MemoryAgent ───→ JSON memory store
-   ↓
-Final result + event logs
+   |
+   v
+MemoryAgent ---- recalls prior reviewer feedback
+   |
+   v
+PlannerAgent --- creates memory-aware task graph
+   |
+   v
+BuilderAgent --- creates deterministic draft
+   |
+   v
+ReviewerAgent -- critiques draft and returns feedback
+   |
+   v
+MemoryAgent ---- stores feedback and outcome
+   |
+   v
+SwarmOrchestrator returns goal, task graph, draft, review, event log
 ```
-
-Memory influences later runs by recalling previous reviewer feedback for similar goal keywords and passing those lessons into the builder and reviewer context.
 
 ## Quickstart
 
@@ -46,24 +42,68 @@ python run_demo.py
 pytest
 ```
 
-No external APIs or services are required.
+The project uses the Python standard library only. `pytest` is used for verification.
 
-## Demo
+## Demo explanation
 
-The included demo runs this goal:
+`run_demo.py` runs the startup landing page demo with this goal:
 
 > Create a landing page outline for an AI consulting service.
 
-It prints the final result and event log entries so you can inspect the commander, planner, builder, reviewer, and memory flow.
+It prints:
 
-## Repository layout
+- goal
+- task graph
+- deterministic draft
+- review feedback
+- event log
+
+Run it twice to see how recalled reviewer feedback influences later planning.
+
+## Folder structure
 
 ```text
-agents/           Deterministic agent classes
-orchestration/    Event bus and swarm orchestrator
-memory/           JSON-backed memory store
-demos/            Example scenarios
-tests/            Pytest test suite
-docs/             Architecture and design notes
-run_demo.py       Root demo entrypoint
+README.md
+pyproject.toml
+run_demo.py
+agents/
+  __init__.py
+  commander.py
+  planner.py
+  builder.py
+  reviewer.py
+  memory_agent.py
+orchestration/
+  __init__.py
+  swarm.py
+  event_bus.py
+  task_graph.py
+memory/
+  __init__.py
+  memory_store.py
+  shared_state.json
+demos/
+  __init__.py
+  startup_landing_page_demo.py
+tests/
+  __init__.py
+  test_agents.py
+  test_memory_store.py
+  test_orchestrator.py
+docs/
+  architecture.md
+  memory_flow.md
+  orchestration_patterns.md
 ```
+
+## Not production
+
+This is **not a production framework**. It is an experimental architecture playground for reliable, memory-aware multi-agent orchestration. The agents are simple by design and do not call external LLM APIs.
+
+## Roadmap
+
+- Add optional LLM-backed agent implementations behind interfaces.
+- Add richer task graph execution states.
+- Add memory scoring and better retrieval.
+- Add CLI options for custom goals.
+- Add examples for research planning, code review, and product strategy.

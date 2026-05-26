@@ -1,4 +1,4 @@
-"""Memory agent wrapper around the JSON memory store."""
+"""Memory agent for recalling and storing reviewer feedback."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -8,22 +8,23 @@ from memory.memory_store import MemoryStore
 
 @dataclass
 class MemoryAgent:
-    """Persist and recall reviewer feedback for orchestration runs."""
+    """Agent wrapper around the JSON-backed memory store."""
 
     store: MemoryStore
-    name: str = "Memory"
+    name: str = "MemoryAgent"
 
     def recall(self, goal: str) -> list[str]:
-        """Recall reviewer feedback related to the current goal."""
+        """Recall previous reviewer feedback relevant to the goal."""
         return self.store.recall_feedback(goal)
 
-    def remember(self, goal: str, review: dict[str, Any], final_outcome: dict[str, Any]) -> dict[str, Any]:
-        """Persist review feedback and final outcome."""
+    def remember(self, goal: str, review: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
+        """Store reviewer feedback and final draft information."""
         entry = {
             "goal": goal,
             "reviewer_feedback": list(review.get("feedback", [])),
             "approved": bool(review.get("approved", False)),
-            "final_outcome": final_outcome,
+            "score": int(review.get("score", 0)),
+            "draft_artifact_type": str(draft.get("artifact_type", "unknown")),
         }
         self.store.append(entry)
         return entry

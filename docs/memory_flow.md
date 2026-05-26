@@ -1,18 +1,21 @@
 # Memory Flow
 
-Memory is stored as a JSON list of entries. Each entry captures:
+Memory is stored in `memory/shared_state.json` as a JSON list.
 
-- the goal
+## Recall
+
+Before planning, `MemoryAgent` asks `MemoryStore` for prior reviewer feedback related to the current goal. The store uses deterministic keyword overlap rather than embeddings or external services.
+
+## Write
+
+After review, `MemoryAgent` writes a compact entry containing:
+
+- goal
 - reviewer feedback
 - approval status
-- final outcome
+- score
+- draft artifact type
 
-## Recall behavior
+## Memory-influenced planning
 
-Before planning and building, the orchestrator asks `MemoryAgent` for relevant prior feedback. The JSON store performs simple keyword overlap between the current goal and previous goals.
-
-This means a second run with a similar goal can include prior reviewer feedback in the builder and reviewer context.
-
-## Why simple memory?
-
-The point is to demonstrate the orchestration seam, not to build a vector database. A JSON store is transparent, inspectable, and deterministic.
+On later runs, recalled feedback is passed into `PlannerAgent`. The planner adds an explicit task called `Apply recalled reviewer feedback`, making memory influence visible in the task graph.

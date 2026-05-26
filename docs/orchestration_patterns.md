@@ -1,29 +1,17 @@
 # Orchestration Patterns
 
-## Commander-worker flow
+## Commander-worker
 
-A commander receives the user goal and delegates specialized work to deterministic worker agents.
+A commander accepts the goal and coordinates a set of specialized worker agents. Each worker has one clear responsibility.
 
 ## Review loop
 
-The builder does not directly produce a final answer. Its output is reviewed first, making quality checks explicit.
+The builder does not directly finalize the output. The reviewer critiques it first, producing feedback that is both returned to the user and stored in memory.
 
-## Event-sourced inspection
+## Memory-aware planning
 
-The event bus records each major step. This creates an audit trail showing which agent acted and what happened.
+Prior reviewer feedback is recalled before planning. When memory exists, the planner turns it into an explicit planning step so future runs can improve without hidden behavior.
 
-## Memory-aware execution
+## Event logging
 
-Reviewer feedback is stored after each run and recalled before later runs. This lets the swarm improve future outputs without changing agent code.
-
-## Deliberate constraints
-
-The project avoids overengineering:
-
-- no external APIs
-- no async runtime
-- no model router
-- no plugin system
-- no production claims
-
-Those can be added later once the orchestration behavior is clear.
+`EventBus` records major actions from the commander, memory agent, planner, builder, reviewer, and orchestrator. This creates an audit trail for debugging and demonstration.

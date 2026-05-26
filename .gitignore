@@ -1,4 +1,4 @@
 __pycache__/
 .pytest_cache/
 *.pyc
-memory/*.json
+memory/demo_memory.json

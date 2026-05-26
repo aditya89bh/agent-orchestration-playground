@@ -1,4 +1,4 @@
-"""In-memory event logging for orchestration runs."""
+"""Event logging for major agent actions."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from typing import Any
 
 @dataclass
 class EventBus:
-    """Collect timestamped orchestration events for inspection."""
+    """In-memory event bus that records timestamped orchestration events."""
 
     events: list[dict[str, Any]] = field(default_factory=list)
 
-    def publish(self, actor: str, action: str, details: dict[str, Any] | None = None) -> None:
-        """Append an event to the log."""
+    def log(self, actor: str, action: str, details: dict[str, Any] | None = None) -> None:
+        """Record a major action in the event log."""
         self.events.append(
             {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -25,5 +25,5 @@ class EventBus:
         )
 
     def snapshot(self) -> list[dict[str, Any]]:
-        """Return a copy of the current event log."""
+        """Return a shallow copy of the event log."""
         return list(self.events)

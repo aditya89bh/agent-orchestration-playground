@@ -1,29 +1,54 @@
-"""Builder agent that turns plan steps into a simple artifact."""
+"""Builder agent for producing deterministic draft artifacts."""
 
 from dataclasses import dataclass
+from typing import Any
+
 
 
 @dataclass(frozen=True)
 class BuilderAgent:
-    """Build a deterministic draft from plan steps and recalled feedback."""
+    """Create a readable draft from a goal and task graph."""
 
-    name: str = "Builder"
+    name: str = "BuilderAgent"
 
-    def build(self, goal: str, steps: list[str], recalled_feedback: list[str] | None = None) -> dict[str, object]:
-        """Create a structured draft artifact."""
-        lessons = recalled_feedback or []
+    def build(self, goal: str, task_graph: Any, recalled_feedback: list[str] | None = None) -> dict[str, Any]:
+        """Build a deterministic draft output."""
         sections = [
-            {"title": "Hero", "content": f"State the promise clearly: {goal}"},
-            {"title": "Problem", "content": "Describe the operational pain the audience already recognizes."},
-            {"title": "Solution", "content": "Show how AI systems, workflows, and automation reduce that pain."},
-            {"title": "Proof", "content": "Include examples, metrics, case studies, or credible founder/operator context."},
-            {"title": "Call to Action", "content": "Invite visitors to book a focused discovery call."},
+            {
+                "title": "Hero",
+                "content": "AI consulting that turns messy workflows into reliable automated systems.",
+            },
+            {
+                "title": "Audience",
+                "content": "Founders and operators who need practical AI systems, not vague AI strategy.",
+            },
+            {
+                "title": "Problem",
+                "content": "Teams lose time to manual processes, scattered knowledge, and fragile handoffs.",
+            },
+            {
+                "title": "Offer",
+                "content": "Workflow audits, agent prototypes, memory systems, evaluations, and deployment plans.",
+            },
+            {
+                "title": "Proof",
+                "content": "Show examples of automation wins, prototype speed, and reliability improvements.",
+            },
+            {
+                "title": "Call to Action",
+                "content": "Book a focused discovery call to identify one high-leverage AI workflow.",
+            },
         ]
-        if lessons:
-            sections.append({"title": "Memory-Informed Improvements", "content": " | ".join(lessons)})
+        if recalled_feedback:
+            sections.append(
+                {
+                    "title": "Memory-Informed Revision Notes",
+                    "content": "Applied prior feedback: " + " | ".join(recalled_feedback),
+                }
+            )
         return {
             "goal": goal,
-            "steps_used": steps,
-            "artifact_type": "landing_page_outline" if "landing page" in goal.lower() else "general_outline",
+            "artifact_type": "landing_page_outline" if "landing page" in goal.lower() else "structured_outline",
+            "task_ids_used": [node.id for node in task_graph.nodes],
             "sections": sections,
         }

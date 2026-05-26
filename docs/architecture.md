@@ -1,21 +1,19 @@
 # Architecture
 
-This project uses a deterministic commander-worker swarm architecture.
+The project demonstrates a deterministic commander-worker flow.
 
-## Components
+## Commander-worker flow
 
-- `CommanderAgent`: accepts and normalizes the user goal, then creates a run brief.
-- `PlannerAgent`: converts the brief into ordered execution steps.
-- `BuilderAgent`: creates a structured draft artifact from the plan.
-- `ReviewerAgent`: evaluates the artifact and returns feedback.
-- `MemoryAgent`: recalls and stores reviewer feedback through a JSON-backed store.
-- `SwarmOrchestrator`: coordinates the sequence and returns the final result plus event logs.
-- `EventBus`: records each meaningful orchestration event.
+The `CommanderAgent` accepts the raw user goal and turns it into a clean brief. The `SwarmOrchestrator` then coordinates specialized worker agents:
 
-## Data flow
+1. `MemoryAgent` recalls prior reviewer feedback.
+2. `PlannerAgent` creates a task graph and includes recalled lessons when available.
+3. `BuilderAgent` creates a deterministic draft from the task graph.
+4. `ReviewerAgent` critiques the draft.
+5. `MemoryAgent` writes the review feedback back to JSON memory.
+
+The orchestration is deliberately linear so the responsibilities are easy to inspect and test.
 
 ```text
-goal -> commander -> planner -> builder -> reviewer -> memory -> result
+Commander -> Memory Recall -> Planner -> Builder -> Reviewer -> Memory Write
 ```
-
-The system intentionally avoids external LLM calls. This keeps behavior deterministic and easy to test.

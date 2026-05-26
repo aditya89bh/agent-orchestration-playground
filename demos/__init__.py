@@ -1,1 +1,1 @@
-"""Demo scenarios for the orchestration playground."""
+"""Demo scenarios for the agent orchestration playground."""
