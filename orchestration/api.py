@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from orchestration import SwarmOrchestrator
+from orchestration.metrics import RuntimeMetrics
 
 
 class OrchestrationRequest(BaseModel):
@@ -21,6 +22,10 @@ class OrchestrationRequest(BaseModel):
     history_path: str = Field(
         default="memory/run_history.json",
         description="Path to JSON run history store.",
+    )
+    backend: str = Field(
+        default="json",
+        description="Persistence backend to use.",
     )
 
 
@@ -36,6 +41,8 @@ app = FastAPI(
     description="Deterministic commander-worker swarm orchestration API.",
     version="0.1.0",
 )
+
+metrics = RuntimeMetrics()
 
 
 @app.get("/", tags=["metadata"])
@@ -54,11 +61,24 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok", service="agent-orchestration-playground")
 
 
+@app.get("/metrics", tags=["metrics"])
+def runtime_metrics() -> dict:
+    """Return runtime orchestration metrics."""
+    return metrics.snapshot()
+
+
 @app.post("/orchestrate", tags=["orchestration"])
 def orchestrate(request: OrchestrationRequest) -> dict:
     """Run the commander-worker orchestration loop."""
-    orchestrator = SwarmOrchestrator(
-        memory_path=Path(request.memory_path),
-        history_path=Path(request.history_path),
-    )
-    return orchestrator.run(request.goal)
+    try:
+        orchestrator = SwarmOrchestrator(
+            memory_path=Path(request.memory_path),
+            history_path=Path(request.history_path),
+            persistence_backend=request.backend,
+        )
+        result = orchestrator.run(request.goal)
+        metrics.record_success(result)
+        return result
+    except Exception as error:
+        metrics.record_failure(error)
+        raise HTTPException(status_code=500, detail=str(error)) from error
