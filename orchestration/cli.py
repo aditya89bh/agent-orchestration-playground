@@ -29,11 +29,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the JSON memory store.",
     )
     parser.add_argument(
+        "--history-path",
+        default="memory/run_history.json",
+        help="Path to the JSON run history store.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Print the full orchestration result as JSON.",
     )
     return parser
+
+
+def _event_name(event: dict) -> str:
+    """Return the normalized event name across event schema versions."""
+    return str(event.get("action") or event.get("event") or "unknown_event")
 
 
 def format_human_output(result: dict) -> str:
@@ -56,9 +66,14 @@ def format_human_output(result: dict) -> str:
     for note in result["review"].get("feedback", []):
         lines.append(f"- {note}")
 
+    if "run_record" in result:
+        lines.append("\nRUN RECORD")
+        lines.append(f"Run ID: {result['run_record']['run_id']}")
+        lines.append(f"Events: {result['run_record']['event_count']}")
+
     lines.append("\nEVENT LOG")
     for event in result["event_log"]:
-        lines.append(f"[{event['actor']}] {event['event']}")
+        lines.append(f"[{event['actor']}] {_event_name(event)}")
 
     return "\n".join(lines)
 
@@ -72,8 +87,10 @@ def run(argv: Sequence[str] | None = None) -> int:
     if not goal:
         parser.error("--goal cannot be empty")
 
-    memory_path = Path(args.memory_path)
-    orchestrator = SwarmOrchestrator(memory_path=memory_path)
+    orchestrator = SwarmOrchestrator(
+        memory_path=Path(args.memory_path),
+        history_path=Path(args.history_path),
+    )
     result = orchestrator.run(goal)
 
     if args.json:
