@@ -19,6 +19,7 @@ from orchestration.event_bus import EventBus
 from orchestration.retry_policy import RetryPolicy
 from orchestration.run_history import RunHistoryStore
 from orchestration.structured_logger import StructuredRunLogger, build_json_logger
+from orchestration.tracing import TraceRecorder
 
 
 @dataclass
@@ -55,22 +56,49 @@ class SwarmOrchestrator:
             logger=build_json_logger(),
         )
 
+        self.trace_recorder = TraceRecorder()
+
     def run(self, goal: str) -> dict[str, Any]:
         """Run the full orchestration loop for a user goal."""
+        orchestration_span = self.trace_recorder.start_span(
+            "orchestration.run",
+            goal=goal,
+            backend=self.persistence_backend,
+        )
+
         self.structured_logger.info(
             "orchestration_started",
             backend=self.persistence_backend,
             goal=goal,
+            trace_id=self.trace_recorder.trace_id,
+        )
+
+        commander_span = self.trace_recorder.start_span(
+            "commander.accept_goal",
+            orchestration_span.span_id,
         )
 
         self.event_bus.log("CommanderAgent", "accepted_goal", {"goal": goal})
         brief = self.commander.accept_goal(goal)
+        commander_span.finish(goal=brief["goal"])
+
+        memory_span = self.trace_recorder.start_span(
+            "memory.recall",
+            orchestration_span.span_id,
+        )
 
         recalled_feedback = self.memory.recall(brief["goal"])
         self.event_bus.log("MemoryAgent", "recalled_feedback", {"feedback": recalled_feedback})
+        memory_span.finish(recalled_feedback=len(recalled_feedback))
+
+        planner_span = self.trace_recorder.start_span(
+            "planner.plan",
+            orchestration_span.span_id,
+        )
 
         task_graph = self.planner.plan(brief["goal"], recalled_feedback)
         self.event_bus.log("PlannerAgent", "created_task_graph", task_graph.to_dict())
+        planner_span.finish(task_count=len(task_graph.to_dict()["nodes"]))
 
         draft, review, attempts = self._run_retry_loop(
             brief["goal"],
@@ -78,20 +106,38 @@ class SwarmOrchestrator:
             recalled_feedback,
         )
 
+        persistence_span = self.trace_recorder.start_span(
+            "memory.persist",
+            orchestration_span.span_id,
+        )
+
         memory_entry = self.memory.remember(brief["goal"], review, draft)
         self.event_bus.log("MemoryAgent", "stored_feedback", memory_entry)
+        persistence_span.finish()
 
         result = self._build_result(brief["goal"], task_graph.to_dict(), draft, review)
         result["attempts"] = attempts
+
+        orchestration_span.finish(
+            approved=review["approved"],
+            attempts=attempts,
+        )
 
         return self._complete_run(result, review)
 
     async def arun(self, goal: str) -> dict[str, Any]:
         """Run the orchestration loop through an async-compatible entrypoint."""
+        orchestration_span = self.trace_recorder.start_span(
+            "orchestration.arun",
+            goal=goal,
+            backend=self.persistence_backend,
+        )
+
         self.structured_logger.info(
             "async_orchestration_started",
             backend=self.persistence_backend,
             goal=goal,
+            trace_id=self.trace_recorder.trace_id,
         )
 
         self.event_bus.log("CommanderAgent", "accepted_goal", {"goal": goal})
@@ -124,6 +170,11 @@ class SwarmOrchestrator:
         result = self._build_result(brief["goal"], task_graph.to_dict(), draft, review)
         result["attempts"] = attempts
 
+        orchestration_span.finish(
+            approved=review["approved"],
+            attempts=attempts,
+        )
+
         return await asyncio.to_thread(self._complete_run, result, review)
 
     def _run_retry_loop(
@@ -136,6 +187,11 @@ class SwarmOrchestrator:
         attempt = 1
 
         while True:
+            build_span = self.trace_recorder.start_span(
+                "builder.build",
+                attributes={"attempt": attempt},
+            )
+
             draft = self.builder.build(goal, task_graph, recalled_feedback)
             self.event_bus.log(
                 "BuilderAgent",
@@ -144,6 +200,12 @@ class SwarmOrchestrator:
                     "artifact_type": draft["artifact_type"],
                     "attempt": attempt,
                 },
+            )
+            build_span.finish(artifact_type=draft["artifact_type"])
+
+            review_span = self.trace_recorder.start_span(
+                "reviewer.review",
+                attributes={"attempt": attempt},
             )
 
             review = self.reviewer.review(draft)
@@ -155,6 +217,7 @@ class SwarmOrchestrator:
                     "attempt": attempt,
                 },
             )
+            review_span.finish(approved=review["approved"])
 
             retry_decision = self.retry_policy.decide(attempt, review)
             self.event_bus.log(
@@ -239,6 +302,7 @@ class SwarmOrchestrator:
             "event_log": self.event_bus.snapshot(),
             "persistence_backend": self.persistence_backend,
             "structured_run_id": self.structured_logger.run_id,
+            "trace": self.trace_recorder.snapshot(),
         }
 
     def _complete_run(self, result: dict[str, Any], review: dict[str, Any]) -> dict[str, Any]:
@@ -262,6 +326,7 @@ class SwarmOrchestrator:
             approved=review["approved"],
             event_count=len(result["event_log"]),
             attempts=result.get("attempts", 1),
+            trace_id=self.trace_recorder.trace_id,
         )
 
         return result
