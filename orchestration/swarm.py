@@ -16,6 +16,7 @@ from memory import MemoryStore
 from memory.base import MemoryBackend, RunHistoryBackend
 from memory.sqlite_store import SQLiteStore
 from orchestration.event_bus import EventBus
+from orchestration.retry_policy import RetryPolicy
 from orchestration.run_history import RunHistoryStore
 from orchestration.structured_logger import StructuredRunLogger, build_json_logger
 
@@ -27,6 +28,7 @@ class SwarmOrchestrator:
     memory_path: str | Path = "memory/shared_state.json"
     history_path: str | Path = "memory/run_history.json"
     persistence_backend: str = "json"
+    retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     event_bus: EventBus = field(default_factory=EventBus)
 
     def __post_init__(self) -> None:
@@ -70,16 +72,18 @@ class SwarmOrchestrator:
         task_graph = self.planner.plan(brief["goal"], recalled_feedback)
         self.event_bus.log("PlannerAgent", "created_task_graph", task_graph.to_dict())
 
-        draft = self.builder.build(brief["goal"], task_graph, recalled_feedback)
-        self.event_bus.log("BuilderAgent", "created_draft", {"artifact_type": draft["artifact_type"]})
-
-        review = self.reviewer.review(draft)
-        self.event_bus.log("ReviewerAgent", "reviewed_draft", review)
+        draft, review, attempts = self._run_retry_loop(
+            brief["goal"],
+            task_graph,
+            recalled_feedback,
+        )
 
         memory_entry = self.memory.remember(brief["goal"], review, draft)
         self.event_bus.log("MemoryAgent", "stored_feedback", memory_entry)
 
         result = self._build_result(brief["goal"], task_graph.to_dict(), draft, review)
+        result["attempts"] = attempts
+
         return self._complete_run(result, review)
 
     async def arun(self, goal: str) -> dict[str, Any]:
@@ -101,19 +105,13 @@ class SwarmOrchestrator:
             brief["goal"],
             recalled_feedback,
         )
-        task_graph_payload = task_graph.to_dict()
-        self.event_bus.log("PlannerAgent", "created_task_graph", task_graph_payload)
+        self.event_bus.log("PlannerAgent", "created_task_graph", task_graph.to_dict())
 
-        draft = await asyncio.to_thread(
-            self.builder.build,
+        draft, review, attempts = await self._arun_retry_loop(
             brief["goal"],
             task_graph,
             recalled_feedback,
         )
-        self.event_bus.log("BuilderAgent", "created_draft", {"artifact_type": draft["artifact_type"]})
-
-        review = await asyncio.to_thread(self.reviewer.review, draft)
-        self.event_bus.log("ReviewerAgent", "reviewed_draft", review)
 
         memory_entry = await asyncio.to_thread(
             self.memory.remember,
@@ -123,8 +121,107 @@ class SwarmOrchestrator:
         )
         self.event_bus.log("MemoryAgent", "stored_feedback", memory_entry)
 
-        result = self._build_result(brief["goal"], task_graph_payload, draft, review)
+        result = self._build_result(brief["goal"], task_graph.to_dict(), draft, review)
+        result["attempts"] = attempts
+
         return await asyncio.to_thread(self._complete_run, result, review)
+
+    def _run_retry_loop(
+        self,
+        goal: str,
+        task_graph: Any,
+        recalled_feedback: list[str],
+    ) -> tuple[dict[str, Any], dict[str, Any], int]:
+        """Run a bounded synchronous retry loop."""
+        attempt = 1
+
+        while True:
+            draft = self.builder.build(goal, task_graph, recalled_feedback)
+            self.event_bus.log(
+                "BuilderAgent",
+                "created_draft",
+                {
+                    "artifact_type": draft["artifact_type"],
+                    "attempt": attempt,
+                },
+            )
+
+            review = self.reviewer.review(draft)
+            self.event_bus.log(
+                "ReviewerAgent",
+                "reviewed_draft",
+                {
+                    **review,
+                    "attempt": attempt,
+                },
+            )
+
+            retry_decision = self.retry_policy.decide(attempt, review)
+            self.event_bus.log(
+                "RetryPolicy",
+                retry_decision.reason,
+                {
+                    "attempt": attempt,
+                    "should_retry": retry_decision.should_retry,
+                },
+            )
+
+            if not retry_decision.should_retry:
+                return draft, review, attempt
+
+            attempt = retry_decision.next_attempt
+            recalled_feedback.extend(review.get("feedback", []))
+
+    async def _arun_retry_loop(
+        self,
+        goal: str,
+        task_graph: Any,
+        recalled_feedback: list[str],
+    ) -> tuple[dict[str, Any], dict[str, Any], int]:
+        """Run a bounded asynchronous retry loop."""
+        attempt = 1
+
+        while True:
+            draft = await asyncio.to_thread(
+                self.builder.build,
+                goal,
+                task_graph,
+                recalled_feedback,
+            )
+            self.event_bus.log(
+                "BuilderAgent",
+                "created_draft",
+                {
+                    "artifact_type": draft["artifact_type"],
+                    "attempt": attempt,
+                },
+            )
+
+            review = await asyncio.to_thread(self.reviewer.review, draft)
+            self.event_bus.log(
+                "ReviewerAgent",
+                "reviewed_draft",
+                {
+                    **review,
+                    "attempt": attempt,
+                },
+            )
+
+            retry_decision = self.retry_policy.decide(attempt, review)
+            self.event_bus.log(
+                "RetryPolicy",
+                retry_decision.reason,
+                {
+                    "attempt": attempt,
+                    "should_retry": retry_decision.should_retry,
+                },
+            )
+
+            if not retry_decision.should_retry:
+                return draft, review, attempt
+
+            attempt = retry_decision.next_attempt
+            recalled_feedback.extend(review.get("feedback", []))
 
     def _build_result(
         self,
@@ -164,6 +261,7 @@ class SwarmOrchestrator:
             backend=self.persistence_backend,
             approved=review["approved"],
             event_count=len(result["event_log"]),
+            attempts=result.get("attempts", 1),
         )
 
         return result
