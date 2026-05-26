@@ -19,6 +19,7 @@ from orchestration.event_bus import EventBus
 from orchestration.retry_policy import RetryPolicy
 from orchestration.run_history import RunHistoryStore
 from orchestration.structured_logger import StructuredRunLogger, build_json_logger
+from orchestration.trace_store import TraceStore
 from orchestration.tracing import TraceRecorder
 
 
@@ -57,6 +58,7 @@ class SwarmOrchestrator:
         )
 
         self.trace_recorder = TraceRecorder()
+        self.trace_store = TraceStore()
 
     def run(self, goal: str) -> dict[str, Any]:
         """Run the full orchestration loop for a user goal."""
@@ -317,6 +319,10 @@ class SwarmOrchestrator:
         )
 
         result["event_log"] = self.event_bus.snapshot()
+
+        trace_payload = result["trace"]
+        self.trace_store.persist(trace_payload)
+
         run_record = self.history_backend.append_run(result)
         result["run_record"] = run_record
 
