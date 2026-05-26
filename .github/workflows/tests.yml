@@ -25,13 +25,17 @@ jobs:
           pip install pytest
           pip install -e .
 
-      - name: Run unit tests
+      - name: Run test suite
         run: pytest
 
       - name: Run CLI smoke test
         run: |
           agent-swarm --goal "Run CI smoke test"
 
-      - name: Run CLI JSON mode smoke test
+      - name: Run CLI JSON smoke test
         run: |
           agent-swarm --goal "Run JSON smoke test" --json
+
+      - name: Validate FastAPI import
+        run: |
+          python -c "from orchestration.api import app; print(app.title)"
