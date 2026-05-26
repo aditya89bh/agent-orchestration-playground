@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from orchestration import SwarmOrchestrator
 from orchestration.metrics import RuntimeMetrics
+from orchestration.plugins import registry as plugin_registry
 from orchestration.queue import InMemoryJobQueue, OrchestrationJob
 from orchestration.worker_pool import WorkerPool
 
@@ -29,6 +30,13 @@ class OrchestrationRequest(BaseModel):
         default="json",
         description="Persistence backend to use.",
     )
+
+
+class PluginExecutionRequest(BaseModel):
+    """Request body for plugin execution."""
+
+    plugin: str
+    payload: dict = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):
@@ -72,6 +80,21 @@ def runtime_metrics() -> dict:
     snapshot = metrics.snapshot()
     snapshot["worker_pool"] = worker_pool.snapshot()
     return snapshot
+
+
+@app.get("/plugins", tags=["plugins"])
+def list_plugins() -> list[dict]:
+    """List registered orchestration plugins."""
+    return plugin_registry.list_plugins()
+
+
+@app.post("/plugins/execute", tags=["plugins"])
+def execute_plugin(request: PluginExecutionRequest) -> dict:
+    """Execute a registered plugin."""
+    try:
+        return plugin_registry.execute(request.plugin, **request.payload)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.get("/jobs", tags=["queue"])
