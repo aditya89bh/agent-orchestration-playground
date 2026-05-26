@@ -12,6 +12,9 @@ from orchestration import SwarmOrchestrator
 DEFAULT_GOAL = "Create a landing page outline for an AI consulting service."
 
 
+VALID_BACKENDS = ("json", "sqlite")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
@@ -34,6 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the JSON run history store.",
     )
     parser.add_argument(
+        "--backend",
+        default="json",
+        choices=VALID_BACKENDS,
+        help="Persistence backend to use.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Print the full orchestration result as JSON.",
@@ -52,6 +61,7 @@ def format_human_output(result: dict) -> str:
     lines.append("AGENT ORCHESTRATION PLAYGROUND")
     lines.append("=" * 38)
     lines.append(f"Goal: {result['goal']}")
+    lines.append(f"Persistence Backend: {result['persistence_backend']}")
 
     lines.append("\nTASK GRAPH")
     for node in result["task_graph"]["nodes"]:
@@ -90,6 +100,7 @@ def run(argv: Sequence[str] | None = None) -> int:
     orchestrator = SwarmOrchestrator(
         memory_path=Path(args.memory_path),
         history_path=Path(args.history_path),
+        persistence_backend=args.backend,
     )
     result = orchestrator.run(goal)
 
