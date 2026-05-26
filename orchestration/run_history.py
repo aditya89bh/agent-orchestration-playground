@@ -9,9 +9,11 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from memory.base import RunHistoryBackend
+
 
 @dataclass
-class RunHistoryStore:
+class RunHistoryStore(RunHistoryBackend):
     """Append-only JSON store for completed orchestration runs."""
 
     path: str | Path = "memory/run_history.json"
@@ -32,7 +34,7 @@ class RunHistoryStore:
             raise ValueError("Run history store must contain a JSON list.")
         return data
 
-    def append(self, result: dict[str, Any]) -> dict[str, Any]:
+    def append_run(self, result: dict[str, Any]) -> dict[str, Any]:
         """Append a compact run summary and return it."""
         runs = self.load()
         record = {
@@ -47,6 +49,10 @@ class RunHistoryStore:
         runs.append(record)
         self.path.write_text(json.dumps(runs, indent=2), encoding="utf-8")
         return record
+
+    def list_runs(self) -> list[dict[str, Any]]:
+        """List all orchestration run summaries."""
+        return self.load()
 
     def clear(self) -> None:
         """Clear all run history."""
