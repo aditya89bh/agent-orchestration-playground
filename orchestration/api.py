@@ -5,9 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from orchestration import SwarmOrchestrator
+from orchestration.dashboard import DASHBOARD_HTML
 from orchestration.metrics import RuntimeMetrics
 from orchestration.plugins import registry as plugin_registry
 from orchestration.queue import InMemoryJobQueue, OrchestrationJob
@@ -58,6 +60,12 @@ worker_pool = WorkerPool(queue=job_queue)
 worker_pool.start()
 
 
+@app.get("/dashboard", response_class=HTMLResponse, tags=["dashboard"])
+def dashboard() -> HTMLResponse:
+    """Return the orchestration control plane dashboard."""
+    return HTMLResponse(content=DASHBOARD_HTML)
+
+
 @app.get("/", tags=["metadata"])
 def root() -> dict[str, str]:
     """Return service metadata."""
@@ -65,6 +73,7 @@ def root() -> dict[str, str]:
         "service": "agent-orchestration-playground",
         "mode": "deterministic",
         "docs": "/docs",
+        "dashboard": "/dashboard",
     }
 
 
