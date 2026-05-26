@@ -11,6 +11,11 @@ dependencies = [
   "pydantic>=2.7.0"
 ]
 
+[project.optional-dependencies]
+redis = [
+  "redis>=5.0.0"
+]
+
 [project.scripts]
 agent-swarm = "orchestration.cli:main"
 
