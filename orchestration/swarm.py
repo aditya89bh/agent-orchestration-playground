@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -67,15 +68,66 @@ class SwarmOrchestrator:
         memory_entry = self.memory.remember(brief["goal"], review, draft)
         self.event_bus.log("MemoryAgent", "stored_feedback", memory_entry)
 
-        result = {
-            "goal": brief["goal"],
-            "task_graph": task_graph.to_dict(),
+        result = self._build_result(brief["goal"], task_graph.to_dict(), draft, review)
+        return self._complete_run(result, review)
+
+    async def arun(self, goal: str) -> dict[str, Any]:
+        """Run the orchestration loop through an async-compatible entrypoint."""
+        self.event_bus.log("CommanderAgent", "accepted_goal", {"goal": goal})
+        brief = await asyncio.to_thread(self.commander.accept_goal, goal)
+
+        recalled_feedback = await asyncio.to_thread(self.memory.recall, brief["goal"])
+        self.event_bus.log("MemoryAgent", "recalled_feedback", {"feedback": recalled_feedback})
+
+        task_graph = await asyncio.to_thread(
+            self.planner.plan,
+            brief["goal"],
+            recalled_feedback,
+        )
+        task_graph_payload = task_graph.to_dict()
+        self.event_bus.log("PlannerAgent", "created_task_graph", task_graph_payload)
+
+        draft = await asyncio.to_thread(
+            self.builder.build,
+            brief["goal"],
+            task_graph,
+            recalled_feedback,
+        )
+        self.event_bus.log("BuilderAgent", "created_draft", {"artifact_type": draft["artifact_type"]})
+
+        review = await asyncio.to_thread(self.reviewer.review, draft)
+        self.event_bus.log("ReviewerAgent", "reviewed_draft", review)
+
+        memory_entry = await asyncio.to_thread(
+            self.memory.remember,
+            brief["goal"],
+            review,
+            draft,
+        )
+        self.event_bus.log("MemoryAgent", "stored_feedback", memory_entry)
+
+        result = self._build_result(brief["goal"], task_graph_payload, draft, review)
+        return await asyncio.to_thread(self._complete_run, result, review)
+
+    def _build_result(
+        self,
+        goal: str,
+        task_graph: dict[str, Any],
+        draft: dict[str, Any],
+        review: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Build the public orchestration result payload."""
+        return {
+            "goal": goal,
+            "task_graph": task_graph,
             "draft": draft,
             "review": review,
             "event_log": self.event_bus.snapshot(),
             "persistence_backend": self.persistence_backend,
         }
 
+    def _complete_run(self, result: dict[str, Any], review: dict[str, Any]) -> dict[str, Any]:
+        """Finalize event logging and persist the run summary."""
         self.event_bus.log(
             "SwarmOrchestrator",
             "completed_run",
@@ -86,7 +138,6 @@ class SwarmOrchestrator:
         )
 
         result["event_log"] = self.event_bus.snapshot()
-
         run_record = self.history_backend.append_run(result)
         result["run_record"] = run_record
 
