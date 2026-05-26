@@ -12,6 +12,8 @@ from agents.memory_agent import MemoryAgent
 from agents.planner import PlannerAgent
 from agents.reviewer import ReviewerAgent
 from memory import MemoryStore
+from memory.base import MemoryBackend, RunHistoryBackend
+from memory.sqlite_store import SQLiteStore
 from orchestration.event_bus import EventBus
 from orchestration.run_history import RunHistoryStore
 
@@ -22,16 +24,28 @@ class SwarmOrchestrator:
 
     memory_path: str | Path = "memory/shared_state.json"
     history_path: str | Path = "memory/run_history.json"
+    persistence_backend: str = "json"
     event_bus: EventBus = field(default_factory=EventBus)
 
     def __post_init__(self) -> None:
-        """Initialize all deterministic agents."""
+        """Initialize deterministic orchestration components."""
         self.commander = CommanderAgent()
         self.planner = PlannerAgent()
         self.builder = BuilderAgent()
         self.reviewer = ReviewerAgent()
-        self.memory = MemoryAgent(MemoryStore(self.memory_path))
-        self.history = RunHistoryStore(self.history_path)
+
+        self.memory_backend: MemoryBackend
+        self.history_backend: RunHistoryBackend
+
+        if self.persistence_backend == "sqlite":
+            sqlite_store = SQLiteStore("memory/orchestration.db")
+            self.memory_backend = sqlite_store
+            self.history_backend = sqlite_store
+        else:
+            self.memory_backend = MemoryStore(self.memory_path)
+            self.history_backend = RunHistoryStore(self.history_path)
+
+        self.memory = MemoryAgent(self.memory_backend)
 
     def run(self, goal: str) -> dict[str, Any]:
         """Run the full orchestration loop for a user goal."""
@@ -59,17 +73,21 @@ class SwarmOrchestrator:
             "draft": draft,
             "review": review,
             "event_log": self.event_bus.snapshot(),
+            "persistence_backend": self.persistence_backend,
         }
 
         self.event_bus.log(
             "SwarmOrchestrator",
             "completed_run",
-            {"approved": review["approved"]},
+            {
+                "approved": review["approved"],
+                "backend": self.persistence_backend,
+            },
         )
 
         result["event_log"] = self.event_bus.snapshot()
 
-        run_record = self.history.append(result)
+        run_record = self.history_backend.append_run(result)
         result["run_record"] = run_record
 
         return result
