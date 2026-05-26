@@ -13,6 +13,7 @@ from agents.planner import PlannerAgent
 from agents.reviewer import ReviewerAgent
 from memory import MemoryStore
 from orchestration.event_bus import EventBus
+from orchestration.run_history import RunHistoryStore
 
 
 @dataclass
@@ -20,6 +21,7 @@ class SwarmOrchestrator:
     """Coordinate commander, planner, builder, reviewer, and memory agents."""
 
     memory_path: str | Path = "memory/shared_state.json"
+    history_path: str | Path = "memory/run_history.json"
     event_bus: EventBus = field(default_factory=EventBus)
 
     def __post_init__(self) -> None:
@@ -29,6 +31,7 @@ class SwarmOrchestrator:
         self.builder = BuilderAgent()
         self.reviewer = ReviewerAgent()
         self.memory = MemoryAgent(MemoryStore(self.memory_path))
+        self.history = RunHistoryStore(self.history_path)
 
     def run(self, goal: str) -> dict[str, Any]:
         """Run the full orchestration loop for a user goal."""
@@ -57,6 +60,16 @@ class SwarmOrchestrator:
             "review": review,
             "event_log": self.event_bus.snapshot(),
         }
-        self.event_bus.log("SwarmOrchestrator", "completed_run", {"approved": review["approved"]})
+
+        self.event_bus.log(
+            "SwarmOrchestrator",
+            "completed_run",
+            {"approved": review["approved"]},
+        )
+
         result["event_log"] = self.event_bus.snapshot()
+
+        run_record = self.history.append(result)
+        result["run_record"] = run_record
+
         return result
