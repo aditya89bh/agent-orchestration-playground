@@ -10,9 +10,11 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from memory.base import MemoryBackend, RunHistoryBackend
+
 
 @dataclass
-class SQLiteStore:
+class SQLiteStore(MemoryBackend, RunHistoryBackend):
     """SQLite persistence layer for production-oriented local storage."""
 
     path: str | Path = "memory/orchestration.db"
