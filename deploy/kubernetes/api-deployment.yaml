@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestration-api
+  namespace: agent-orchestration
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orchestration-api
+  template:
+    metadata:
+      labels:
+        app: orchestration-api
+    spec:
+      containers:
+        - name: orchestration-api
+          image: agent-orchestration-playground:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: ORCHESTRATION_BACKEND
+              value: postgres
+            - name: POSTGRES_URL
+              value: postgresql://postgres:postgres@postgres:5432/orchestration
+            - name: REDIS_URL
+              value: redis://redis:6379/0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestration-api
+  namespace: agent-orchestration
+spec:
+  selector:
+    app: orchestration-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
