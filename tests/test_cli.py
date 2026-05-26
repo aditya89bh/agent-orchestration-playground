@@ -14,6 +14,8 @@ def test_cli_accepts_custom_goal(tmp_path, capsys) -> None:
         CUSTOM_GOAL,
         "--memory-path",
         str(tmp_path / "memory.json"),
+        "--history-path",
+        str(tmp_path / "history.json"),
     ])
 
     captured = capsys.readouterr()
@@ -22,6 +24,7 @@ def test_cli_accepts_custom_goal(tmp_path, capsys) -> None:
     assert CUSTOM_GOAL in captured.out
     assert "AGENT ORCHESTRATION PLAYGROUND" in captured.out
     assert "EVENT LOG" in captured.out
+    assert "RUN RECORD" in captured.out
 
 
 def test_cli_json_output_is_parseable(tmp_path, capsys) -> None:
@@ -30,6 +33,8 @@ def test_cli_json_output_is_parseable(tmp_path, capsys) -> None:
         CUSTOM_GOAL,
         "--memory-path",
         str(tmp_path / "memory.json"),
+        "--history-path",
+        str(tmp_path / "history.json"),
         "--json",
     ])
 
@@ -40,6 +45,7 @@ def test_cli_json_output_is_parseable(tmp_path, capsys) -> None:
     assert payload["goal"] == CUSTOM_GOAL
     assert payload["task_graph"]["nodes"]
     assert payload["event_log"]
+    assert payload["run_record"]
 
 
 def test_cli_rejects_empty_goal() -> None:
@@ -64,8 +70,12 @@ def test_human_output_contains_core_sections() -> None:
             "approved": True,
             "feedback": ["Looks good."],
         },
+        "run_record": {
+            "run_id": "demo-run-id",
+            "event_count": 1,
+        },
         "event_log": [
-            {"actor": "CommanderAgent", "event": "accepted_goal"},
+            {"actor": "CommanderAgent", "action": "accepted_goal"},
         ],
     }
 
@@ -75,3 +85,5 @@ def test_human_output_contains_core_sections() -> None:
     assert "DRAFT" in output
     assert "REVIEW" in output
     assert "EVENT LOG" in output
+    assert "RUN RECORD" in output
+    assert "accepted_goal" in output
