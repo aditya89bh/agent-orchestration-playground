@@ -17,6 +17,7 @@ from memory.base import MemoryBackend, RunHistoryBackend
 from memory.sqlite_store import SQLiteStore
 from orchestration.event_bus import EventBus
 from orchestration.run_history import RunHistoryStore
+from orchestration.structured_logger import StructuredRunLogger, build_json_logger
 
 
 @dataclass
@@ -48,8 +49,18 @@ class SwarmOrchestrator:
 
         self.memory = MemoryAgent(self.memory_backend)
 
+        self.structured_logger = StructuredRunLogger(
+            logger=build_json_logger(),
+        )
+
     def run(self, goal: str) -> dict[str, Any]:
         """Run the full orchestration loop for a user goal."""
+        self.structured_logger.info(
+            "orchestration_started",
+            backend=self.persistence_backend,
+            goal=goal,
+        )
+
         self.event_bus.log("CommanderAgent", "accepted_goal", {"goal": goal})
         brief = self.commander.accept_goal(goal)
 
@@ -73,6 +84,12 @@ class SwarmOrchestrator:
 
     async def arun(self, goal: str) -> dict[str, Any]:
         """Run the orchestration loop through an async-compatible entrypoint."""
+        self.structured_logger.info(
+            "async_orchestration_started",
+            backend=self.persistence_backend,
+            goal=goal,
+        )
+
         self.event_bus.log("CommanderAgent", "accepted_goal", {"goal": goal})
         brief = await asyncio.to_thread(self.commander.accept_goal, goal)
 
@@ -124,6 +141,7 @@ class SwarmOrchestrator:
             "review": review,
             "event_log": self.event_bus.snapshot(),
             "persistence_backend": self.persistence_backend,
+            "structured_run_id": self.structured_logger.run_id,
         }
 
     def _complete_run(self, result: dict[str, Any], review: dict[str, Any]) -> dict[str, Any]:
@@ -140,5 +158,12 @@ class SwarmOrchestrator:
         result["event_log"] = self.event_bus.snapshot()
         run_record = self.history_backend.append_run(result)
         result["run_record"] = run_record
+
+        self.structured_logger.info(
+            "orchestration_completed",
+            backend=self.persistence_backend,
+            approved=review["approved"],
+            event_count=len(result["event_log"]),
+        )
 
         return result
