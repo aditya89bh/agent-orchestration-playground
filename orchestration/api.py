@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
@@ -13,6 +13,7 @@ from orchestration.dashboard import DASHBOARD_HTML
 from orchestration.metrics import RuntimeMetrics
 from orchestration.plugins import registry as plugin_registry
 from orchestration.queue import InMemoryJobQueue, OrchestrationJob
+from orchestration.websocket_manager import WebSocketEventManager
 from orchestration.worker_pool import WorkerPool
 
 
@@ -56,8 +57,21 @@ app = FastAPI(
 
 metrics = RuntimeMetrics()
 job_queue = InMemoryJobQueue()
+event_manager = WebSocketEventManager()
 worker_pool = WorkerPool(queue=job_queue)
 worker_pool.start()
+
+
+@app.websocket("/ws/events")
+async def websocket_events(websocket: WebSocket) -> None:
+    """Stream live orchestration events to dashboard clients."""
+    await event_manager.connect(websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        event_manager.disconnect(websocket)
 
 
 @app.get("/dashboard", response_class=HTMLResponse, tags=["dashboard"])
@@ -74,6 +88,7 @@ def root() -> dict[str, str]:
         "mode": "deterministic",
         "docs": "/docs",
         "dashboard": "/dashboard",
+        "events": "/ws/events",
     }
 
 
@@ -88,6 +103,7 @@ def runtime_metrics() -> dict:
     """Return runtime orchestration metrics."""
     snapshot = metrics.snapshot()
     snapshot["worker_pool"] = worker_pool.snapshot()
+    snapshot["websocket_clients"] = len(event_manager.active_connections)
     return snapshot
 
 
@@ -101,7 +117,12 @@ def list_plugins() -> list[dict]:
 def execute_plugin(request: PluginExecutionRequest) -> dict:
     """Execute a registered plugin."""
     try:
-        return plugin_registry.execute(request.plugin, **request.payload)
+        result = plugin_registry.execute(request.plugin, **request.payload)
+        event_manager.broadcast_sync(
+            "plugin_executed",
+            plugin=request.plugin,
+        )
+        return result
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -135,6 +156,13 @@ def submit_job(request: OrchestrationRequest) -> dict:
 
     job_queue.submit(job)
 
+    event_manager.broadcast_sync(
+        "job_submitted",
+        job_id=job.job_id,
+        goal=job.goal,
+        backend=job.backend,
+    )
+
     return {
         "message": "Job submitted",
         "job_id": job.job_id,
@@ -151,9 +179,31 @@ def orchestrate(request: OrchestrationRequest) -> dict:
             history_path=Path(request.history_path),
             persistence_backend=request.backend,
         )
+
+        event_manager.broadcast_sync(
+            "orchestration_started",
+            goal=request.goal,
+            backend=request.backend,
+        )
+
         result = orchestrator.run(request.goal)
         metrics.record_success(result)
+
+        event_manager.broadcast_sync(
+            "orchestration_completed",
+            goal=request.goal,
+            approved=result["review"]["approved"],
+            trace_id=result["trace"]["trace_id"],
+        )
+
         return result
     except Exception as error:
         metrics.record_failure(error)
+
+        event_manager.broadcast_sync(
+            "orchestration_failed",
+            goal=request.goal,
+            error=str(error),
+        )
+
         raise HTTPException(status_code=500, detail=str(error)) from error
