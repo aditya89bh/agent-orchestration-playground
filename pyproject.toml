@@ -15,6 +15,9 @@ dependencies = [
 redis = [
   "redis>=5.0.0"
 ]
+postgres = [
+  "psycopg[binary]>=3.2.0"
+]
 
 [project.scripts]
 agent-swarm = "orchestration.cli:main"
