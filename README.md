@@ -23,6 +23,35 @@ This playground focuses on four primitives:
 | Review loop | Output is critiqued before being treated as final. |
 | Memory influence | Prior feedback can affect future planning. |
 
+## Dashboard Visualization
+
+The repo now includes a lightweight orchestration dashboard built with Streamlit.
+
+The dashboard visualizes:
+
+- Multi-tenant orchestration
+- Workflow schedules
+- Replay visualization
+- Execution timelines
+- Tenant-aware orchestration state
+- Governance and quotas
+
+### Run dashboard
+
+```bash
+pip install -r requirements.txt
+export PYTHONPATH=$(pwd)
+streamlit run dashboard/streamlit_dashboard.py
+```
+
+The dashboard includes:
+
+| View | Purpose |
+|---|---|
+| Tenant Overview | View isolated orchestration tenants and workflow counts. |
+| Replay Visualization | Inspect failed orchestration replay traces. |
+| Execution Timeline | Step-by-step orchestration execution reconstruction. |
+
 ## Architecture
 
 ```text
@@ -102,11 +131,35 @@ The demo prints:
 
 Run it twice to see recalled reviewer feedback influence the next plan.
 
+## Multi-tenant orchestration showcase
+
+The repo includes a multi-tenant orchestration showcase with:
+
+- Tenant-aware workflows
+- Workflow versioning
+- Replay infrastructure
+- Governance policies
+- Recurring workflow scheduling
+- Tenant isolation semantics
+
+Run:
+
+```bash
+python demos/multi_tenant_showcase.py
+```
+
+Replay showcase:
+
+```bash
+python demos/replay_visualization_demo.py
+```
+
 ## Repository structure
 
 ```text
 README.md
 pyproject.toml
+requirements.txt
 run_demo.py
 agents/
   commander.py
@@ -118,11 +171,19 @@ orchestration/
   swarm.py
   event_bus.py
   task_graph.py
+  workflow_registry.py
+  scheduler.py
+  replay_engine.py
+  policy_engine.py
 memory/
   memory_store.py
   shared_state.json
+dashboard/
+  streamlit_dashboard.py
 demos/
   startup_landing_page_demo.py
+  multi_tenant_showcase.py
+  replay_visualization_demo.py
 tests/
   test_agents.py
   test_memory_store.py
@@ -154,10 +215,10 @@ The agents are intentionally simple. The point is to make the coordination patte
 
 ## Roadmap
 
-- Add retry loop after reviewer critique.
-- Add richer task graph states.
-- Add memory scoring and retrieval filters.
-- Add CLI options for custom goals.
+- Add replay DAG visualization.
+- Add orchestration execution graph rendering.
+- Add richer tenant analytics.
+- Add workflow execution persistence metrics.
+- Add architecture diagrams and deployment examples.
 - Add optional LLM-backed agent implementations behind interfaces.
-- Add examples for research planning, code review, and product strategy.
-- Add web dashboard for event traces.
+- Add production orchestration deployment examples.
