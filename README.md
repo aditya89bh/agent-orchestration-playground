@@ -75,6 +75,36 @@ This playground focuses on the smallest useful orchestration primitives:
 | Governance policies | Quotas and execution limits are enforced. |
 | Memory influence | Prior feedback can affect future planning. |
 
+## System Architecture
+
+```mermaid
+graph TD
+    A[User Goal] --> B[Commander Agent]
+    B --> C[Swarm Orchestrator]
+
+    C --> D[Planner Agent]
+    C --> E[Builder Agent]
+    C --> F[Reviewer Agent]
+    C --> G[Memory Agent]
+    C --> H[Policy Engine]
+    C --> I[Replay Engine]
+    C --> J[Workflow Scheduler]
+    C --> K[Event Bus]
+
+    D --> L[Task Graph]
+    E --> M[Deterministic Output]
+    F --> N[Review Feedback]
+    G --> O[Memory Store]
+    H --> P[Governance Rules]
+    I --> Q[Execution Replay]
+    J --> R[Recurring Workflows]
+    K --> S[Execution Trace]
+
+    S --> T[Streamlit Dashboard]
+    Q --> T
+    P --> T
+```
+
 ## Dashboard Visualization
 
 The repo now includes a lightweight orchestration dashboard built with Streamlit.
