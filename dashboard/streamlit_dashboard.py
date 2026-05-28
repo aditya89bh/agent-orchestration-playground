@@ -63,6 +63,34 @@ for index, row in enumerate(showcase["showcase_rows"]):
 
 st.divider()
 
+st.header("Replay DAG Visualization")
+
+st.graphviz_chart(
+    """
+    digraph {
+        rankdir=TB;
+        node [shape=box style=rounded];
+
+        Goal -> Planner;
+        Planner -> TaskGraph;
+
+        TaskGraph -> ValidateRobotProgram;
+        TaskGraph -> ExecuteWorkflow;
+        TaskGraph -> ReviewExecution;
+        TaskGraph -> EscalationPath;
+
+        ExecuteWorkflow -> CollisionRiskDetected;
+        CollisionRiskDetected -> ReplayEngine;
+
+        ReplayEngine -> ReplayTrace;
+        ReplayTrace -> GovernanceCheckpoint;
+        GovernanceCheckpoint -> StreamlitDashboard;
+    }
+    """
+)
+
+st.divider()
+
 st.header("Replay Visualization")
 
 failure = replay["failure_summary"]
