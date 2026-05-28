@@ -14,6 +14,7 @@ class ExecutionQuota:
     max_scheduled_workflows: int = 25
     max_replays_per_hour: int = 50
     max_plugin_executions_per_hour: int = 100
+    max_workflow_executions_per_hour: int = 250
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -21,6 +22,7 @@ class ExecutionQuota:
             "max_scheduled_workflows": self.max_scheduled_workflows,
             "max_replays_per_hour": self.max_replays_per_hour,
             "max_plugin_executions_per_hour": self.max_plugin_executions_per_hour,
+            "max_workflow_executions_per_hour": self.max_workflow_executions_per_hour,
         }
 
 
@@ -94,14 +96,21 @@ class PolicyEngine:
     def evaluate_replay(
         self,
         tenant_id: str,
+        replay_count: int = 0,
     ) -> PolicyDecision:
-        """Evaluate replay permissions."""
+        """Evaluate replay permissions and quotas."""
         policy = self.get_policy(tenant_id)
 
         if not policy.allow_replay:
             return PolicyDecision(
                 allowed=False,
                 reason="Replay disabled for tenant.",
+            )
+
+        if replay_count >= policy.quotas.max_replays_per_hour:
+            return PolicyDecision(
+                allowed=False,
+                reason="Replay quota exceeded.",
             )
 
         return PolicyDecision(
@@ -140,8 +149,9 @@ class PolicyEngine:
     def evaluate_plugins(
         self,
         tenant_id: str,
+        plugin_execution_count: int = 0,
     ) -> PolicyDecision:
-        """Evaluate plugin execution permissions."""
+        """Evaluate plugin execution permissions and quotas."""
         policy = self.get_policy(tenant_id)
 
         if not policy.allow_plugins:
@@ -150,7 +160,48 @@ class PolicyEngine:
                 reason="Plugins disabled for tenant.",
             )
 
+        if (
+            plugin_execution_count
+            >= policy.quotas.max_plugin_executions_per_hour
+        ):
+            return PolicyDecision(
+                allowed=False,
+                reason="Plugin execution quota exceeded.",
+            )
+
         return PolicyDecision(
             allowed=True,
             reason="Plugins allowed.",
+        )
+
+    def evaluate_workflow_execution(
+        self,
+        tenant_id: str,
+        concurrent_workflow_count: int,
+        workflow_execution_count: int,
+    ) -> PolicyDecision:
+        """Evaluate workflow runtime quotas."""
+        policy = self.get_policy(tenant_id)
+
+        if (
+            concurrent_workflow_count
+            >= policy.quotas.max_concurrent_workflows
+        ):
+            return PolicyDecision(
+                allowed=False,
+                reason="Concurrent workflow quota exceeded.",
+            )
+
+        if (
+            workflow_execution_count
+            >= policy.quotas.max_workflow_executions_per_hour
+        ):
+            return PolicyDecision(
+                allowed=False,
+                reason="Workflow execution quota exceeded.",
+            )
+
+        return PolicyDecision(
+            allowed=True,
+            reason="Workflow execution allowed.",
         )
