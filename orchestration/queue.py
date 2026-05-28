@@ -28,6 +28,8 @@ class OrchestrationJob:
     backend: str = "json"
     memory_path: str = "memory/shared_state.json"
     history_path: str = "memory/run_history.json"
+    tenant_id: str = "default-tenant"
+    workflow_namespace: str = "default"
     job_id: str = field(default_factory=lambda: str(uuid4()))
     status: JobStatus = JobStatus.QUEUED
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -58,6 +60,8 @@ class OrchestrationJob:
             "job_id": self.job_id,
             "goal": self.goal,
             "backend": self.backend,
+            "tenant_id": self.tenant_id,
+            "workflow_namespace": self.workflow_namespace,
             "status": self.status.value,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
