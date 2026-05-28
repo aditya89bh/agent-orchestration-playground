@@ -1,26 +1,74 @@
 # Agent Orchestration Playground
 
-> A deterministic commander-worker swarm for studying planner-builder-reviewer coordination, event traces, and memory-influenced execution.
+> Multi-tenant orchestration runtime for studying memory-aware workflows, replayable execution traces, governance policies, and inspectable agent coordination.
 
 [![Tests](https://github.com/aditya89bh/agent-orchestration-playground/actions/workflows/tests.yml/badge.svg)](https://github.com/aditya89bh/agent-orchestration-playground/actions/workflows/tests.yml)
 
+## Platform Preview
+
+The platform now includes:
+
+- Multi-tenant orchestration
+- Replayable execution traces
+- Workflow scheduling
+- Governance and quotas
+- Execution timelines
+- Streamlit orchestration dashboard
+- Tenant-aware workflow isolation
+
+### Dashboard Preview
+
+```text
+Tenant Overview
+├── Northstar Marketing Studio
+├── Orangewood Robotics Factory
+└── Atlas Research Lab
+
+Replay Visualization
+├── inspect_cell_state
+├── validate_robot_program
+├── deploy_robot_workflow
+└── collision_risk_detected
+```
+
 Most agent demos optimize for spectacle. This repo optimizes for inspectability.
 
-It shows the smallest useful version of a memory-aware orchestration loop: a commander receives a goal, a planner decomposes it, a builder creates an output, a reviewer critiques it, and a memory agent stores feedback that can change later runs.
+The system focuses on making orchestration behavior visible:
 
-No external LLM calls. No hidden prompt magic. No fake autonomy theater.
+- Which workflow executed?
+- Which tenant triggered it?
+- Which replay reconstructed it?
+- Which policy governed it?
+- Which trace captured the failure?
+
+No fake autonomy theater.
+No hidden prompt orchestration.
+No opaque agent magic.
 
 ## Why this matters
 
-Multi-agent systems become useful only when their behavior can be traced, reviewed, and improved. The core problem is not merely getting agents to talk to each other. The harder problem is making coordination visible enough that a developer can debug it.
+Multi-agent systems become useful only when their behavior can be traced, reviewed, and improved.
 
-This playground focuses on four primitives:
+The hard problem is not merely getting agents to communicate.
+
+The hard problem is making orchestration visible enough that developers can:
+
+- debug workflows
+- replay failures
+- inspect execution timelines
+- isolate tenant behavior
+- enforce governance boundaries
+- understand why systems fail
+
+This playground focuses on the smallest useful orchestration primitives:
 
 | Primitive | Purpose |
 |---|---|
 | Role separation | Each agent has one clear responsibility. |
-| Event logging | Every major step leaves an inspectable trace. |
-| Review loop | Output is critiqued before being treated as final. |
+| Event logging | Every orchestration step leaves an inspectable trace. |
+| Replay infrastructure | Failed workflows can be reconstructed and replayed. |
+| Tenant isolation | Workflows and traces remain scoped to tenants. |
+| Governance policies | Quotas and execution limits are enforced. |
 | Memory influence | Prior feedback can affect future planning. |
 
 ## Dashboard Visualization
