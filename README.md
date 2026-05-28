@@ -4,6 +4,10 @@
 
 [![Tests](https://github.com/aditya89bh/agent-orchestration-playground/actions/workflows/tests.yml/badge.svg)](https://github.com/aditya89bh/agent-orchestration-playground/actions/workflows/tests.yml)
 
+## Live Demo
+
+- Live Dashboard: https://agent-orchestration-playground-ikjthkttcrdugyb5b7yhjb.streamlit.app/
+
 ## Platform Preview
 
 The platform now includes:
