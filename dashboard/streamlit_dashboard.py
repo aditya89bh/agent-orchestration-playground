@@ -79,6 +79,85 @@ st.dataframe(
 
 st.divider()
 
+st.header("Failure Escalation Center")
+
+incident_rows = [
+    {
+        "incident_id": "INC-001",
+        "tenant": "Orangewood Robotics Factory",
+        "workflow": "CNC Deployment Readiness Workflow",
+        "severity": "High",
+        "status": "Escalated",
+        "resolution": "Replay generated for operator review",
+    },
+    {
+        "incident_id": "INC-002",
+        "tenant": "Northstar Marketing Studio",
+        "workflow": "Content Research Pipeline",
+        "severity": "Low",
+        "status": "Auto-Recovered",
+        "resolution": "Retried with prior reviewer feedback",
+    },
+    {
+        "incident_id": "INC-003",
+        "tenant": "Atlas Research Lab",
+        "workflow": "Paper Review Automation Workflow",
+        "severity": "Medium",
+        "status": "Replayed",
+        "resolution": "Trace inspected and replay accepted",
+    },
+]
+
+esc_a, esc_b, esc_c, esc_d = st.columns(4)
+
+with esc_a:
+    st.metric("Auto-Recovered", 1)
+
+with esc_b:
+    st.metric("Replayed", 1)
+
+with esc_c:
+    st.metric("Escalated", 1)
+
+with esc_d:
+    st.metric("Human Review Required", 1)
+
+st.subheader("Recent Incidents")
+st.dataframe(
+    incident_rows,
+    use_container_width=True,
+    hide_index=True,
+)
+
+st.divider()
+
+st.header("Event Stream Viewer")
+
+event_rows = [
+    {"time": "09:01", "source": "CommanderAgent", "event": "workflow_started", "status": "ok"},
+    {"time": "09:01", "source": "MemoryAgent", "event": "prior_feedback_retrieved", "status": "ok"},
+    {"time": "09:02", "source": "PlannerAgent", "event": "task_graph_created", "status": "ok"},
+    {"time": "09:02", "source": "PolicyEngine", "event": "quota_check_passed", "status": "ok"},
+    {"time": "09:03", "source": "WorkflowRuntime", "event": "collision_risk_detected", "status": "failed"},
+    {"time": "09:03", "source": "ReplayEngine", "event": "trace_replay_triggered", "status": "replayed"},
+    {"time": "09:04", "source": "EscalationCenter", "event": "operator_review_required", "status": "escalated"},
+]
+
+for event in event_rows:
+    status = event["status"]
+    label = f"{event['time']} · {event['source']} · {event['event']}"
+
+    if status == "failed":
+        st.error(label)
+    elif status == "escalated":
+        st.warning(label)
+    elif status == "replayed":
+        st.info(label)
+    else:
+        st.success(label)
+
+st.divider()
+
 st.header("Tenant Overview")
 
 columns = st.columns(3)
