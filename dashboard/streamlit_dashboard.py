@@ -28,6 +28,57 @@ st.caption("Multi-tenant orchestration runtime visualization")
 
 st.divider()
 
+st.header("Platform Analytics")
+
+analytics_rows = []
+for row in showcase["showcase_rows"]:
+    tenant = row["tenant"]
+    policy = row["policy"]
+    schedule = row["schedule"]
+
+    analytics_rows.append(
+        {
+            "tenant": tenant["name"],
+            "namespace": row["workflow"]["workflow_namespace"],
+            "workflows": row["tenant_workflow_count"],
+            "schedules": row["tenant_schedule_count"],
+            "max_concurrent_workflows": policy["quotas"]["max_concurrent_workflows"],
+            "max_replays_per_hour": policy["quotas"]["max_replays_per_hour"],
+            "schedule_enabled": bool(schedule),
+        }
+    )
+
+total_workflows = sum(row["workflows"] for row in analytics_rows)
+total_schedules = sum(row["schedules"] for row in analytics_rows)
+replay_count = replay["replayable_trace_count"]
+escalation_count = 1 if replay["failure_summary"]["escalation_required"] else 0
+
+col_a, col_b, col_c, col_d, col_e = st.columns(5)
+
+with col_a:
+    st.metric("Tenants", showcase["tenant_count"])
+
+with col_b:
+    st.metric("Workflows", total_workflows)
+
+with col_c:
+    st.metric("Schedules", total_schedules)
+
+with col_d:
+    st.metric("Replay Traces", replay_count)
+
+with col_e:
+    st.metric("Escalations", escalation_count)
+
+st.subheader("Tenant Analytics")
+st.dataframe(
+    analytics_rows,
+    use_container_width=True,
+    hide_index=True,
+)
+
+st.divider()
+
 st.header("Tenant Overview")
 
 columns = st.columns(3)
